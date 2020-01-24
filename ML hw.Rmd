@@ -1,0 +1,563 @@
+---
+title: "Solutions to Selected ISLR Ch 4 & 5 Questions"
+author: "Preeti R Dasari"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Installing relevant packages
+
+```{r, include=FALSE}
+require("ISLR")
+require("car")
+require("MASS")
+require("class")
+require("boot")
+```
+
+```{r, eval=FALSE}
+require("ISLR")
+require("car")
+require("MASS")
+require("class")
+require("boot")
+```
+
+## ISLR Chapter 4
+
+## Question 10
+
+```{r}
+data("Weekly")
+names(Weekly)
+attach(Weekly)
+```
+
+### Part a
+
+```{r}
+summary(Weekly)
+```
+
+```{r}
+scatterplotMatrix(~Year+Lag1+Lag2+Lag3+Lag4+Lag5+Volume+Today+Direction, data=Weekly, 
+                  smooth=FALSE, regLine=FALSE, ellipse=FALSE, 
+                  main="Scatterplot Matrix of Weekly Data")
+```
+
+The variables Year and Volume seem to be correlated. Volume increases as we move forward in time. 
+
+### Part b
+
+```{r}
+logmodel <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, 
+                data = Weekly, family = binomial())
+summary(logmodel)
+```
+
+Out of all the predictors, only Lag2 has a p value that is less than the critical value at 95% confidence level. Hence, Lag2 appears to be the only predictor that is statistically significant.
+
+### Part c
+
+```{r}
+logprob <- predict(logmodel, data=Weekly, type = "response")
+logpred <- ifelse(logprob > 0.5, "Up", "Down")
+table(logpred, Weekly$Direction)
+predrate <- (54+557)/1089
+predrate
+```
+
+The confusion matrix shows that the logistic regression model correctly predicted the Direction "Down" for 54 data points in the data set and wrongly predicted the direction "Up" for 430 data points that originally were classified as "Down". Similarly, the model correctly predicted "Up" for 557 data points and wrongly predicted the direction "Down" for 48 points that were originally "Up".
+
+The accuracy rate of prediction by this model is 56.10%.
+
+
+### Part d
+
+```{r}
+train = (Year<2009)
+test = Weekly[!train,]
+dim(test)
+Direction.2009 = Direction[!train]
+trainmodel = glm(Direction ~ Lag2, data = Weekly, family = binomial(), subset = train)
+train.probs = predict(trainmodel, test, type = "response")
+train.preds = rep("Down ", 104)
+train.preds[train.probs >.5] = "Up"
+table(train.preds, Direction.2009)
+trainrate <- (9+56)/104
+trainrate
+```
+
+The overall fraction of correct predictions for the test data is 62.5%.
+
+### Part e
+
+```{r}
+ldamodel <- lda(Direction ~ Lag2, data = Weekly, family = binomial(), subset = train)
+lda.preds = predict(ldamodel, test)
+lda.class = lda.preds$class
+table(lda.class, Direction.2009)
+ldarate <- (9+56)/104
+ldarate
+```
+
+The overall fraction of correct predictions by the LDA model for the test data is 62.5%. 
+
+### Part f
+
+```{r}
+qdamodel <- qda(Direction ~ Lag2, data = Weekly, family = binomial(), subset = train)
+qda.preds = predict(qdamodel, test)
+qda.class = qda.preds$class
+table(qda.class, Direction.2009)
+qdarate <- (61)/104
+qdarate
+```
+
+The  fraction of correct predictions by the QDA model for the test data is 58.65%. 
+
+### Part g
+
+```{r}
+set.seed(1)
+traindata = Weekly[train, ]
+train.X = cbind(traindata$Lag2)
+test.X = cbind(test$Lag2)
+train.Direction = Direction[train]
+knn.pred <- knn(train.X, test.X, traindata$Direction, k=1)
+table(knn.pred, test$Direction)
+knnrate <- (21+31)/104
+knnrate
+```
+
+The  fraction of correct predictions by the KNN method with K = 1 for the test data is 50%. 
+
+### Part h
+
+Judging by the overall prediction rates, logistic regression and LDA models seem to provide the best results. Both these methods produced accuracy rates of 62.5% while QDA produced 58.65% and KNN method produced 50%. 
+
+### Part i
+
+### Logistic Regression with Lag2*Volume as an interaction variable
+
+```{r}
+logmodel2 <- glm(Direction ~ Lag2*Volume, 
+                data = Weekly, family = binomial())
+summary(logmodel2)
+logprob2 <- predict(logmodel2, data=Weekly, type = "response")
+logpred2 <- ifelse(logprob2 > 0.5, "Up", "Down")
+table(logpred2, Weekly$Direction)
+log2rate <- (33+579)/1089
+log2rate
+```
+
+I built a second logistic regression model with Lag2*Volume as an interaction variable. By looking at the confusion matrix, we can observe that the predictions are very similar to the first model's predictions. The accuracy rate also increased by only 0.09%.
+
+### KNN Method with K = 5
+
+```{r}
+knn.pred2 <- knn(train.X, test.X, traindata$Direction, k=5)
+table(knn.pred2, test$Direction)
+knnrate2 <- (15+41)/104
+knnrate2
+```
+
+### KNN Method with K = 10
+
+```{r}
+knn.pred3 <- knn(train.X, test.X, traindata$Direction, k=10)
+table(knn.pred3, test$Direction)
+knnrate3 <- (17+42)/104
+knnrate3
+```
+
+### KNN Method with K = 15
+
+```{r}
+knn.pred4 <- knn(train.X, test.X, traindata$Direction, k=15)
+table(knn.pred4, test$Direction)
+knnrate4 <- (20+41)/104
+knnrate4
+```
+
+### KNN Method with K = 30
+
+```{r}
+knn.pred5 <- knn(train.X, test.X, traindata$Direction, k=15)
+table(knn.pred5, test$Direction)
+knnrate5 <- (20+41)/104
+knnrate5
+```
+
+As the value of K increases from 1 to 15, the model's accuracy in predicting Direction improves from 50% to 58.65%. However, after K = 15, the model produces similar results. Hence, approximately K = 15 appears to the optimal value to use when predicting Direction using Lag2. 
+
+## Question 11
+
+```{r}
+data(Auto)
+names(Auto)
+```
+
+### Part a
+
+```{r}
+median <- median(Auto$mpg)
+mpg01 <- ifelse(Auto$mpg > median, 1, 0)
+Autodf <- data.frame(Auto, mpg01)
+```
+
+
+### Part b
+
+```{r}
+scatterplotMatrix(~mpg+cylinders+displacement+horsepower+weight+acceleration+year+origin+name|mpg01,
+                  data=Autodf, smooth=FALSE, regLine=FALSE, ellipse=FALSE, 
+                  main="Scatterplot Matrix of Auto Data")
+```
+
+In the plot, cars with mpg above the median are represented in pink and cars with mpg below the median (mpg01 = 0) are represented in blue. The variables displacement, horsepower and acceleration appear to be strongly correlated with mpg. The variable weight is also correlated to horsepower and displacement. 
+
+Cars with mpg below the median appear to have higher levels of horspower, displacement, weight and cylinders. 
+
+### Part c
+
+```{r}
+set.seed(1)
+sample = floor(0.75*nrow(Autodf)) # setting 75% for training and 25% for testing
+sample
+train_id <- sample(seq_len(nrow(Autodf)),size = sample)
+auto.train <- Autodf[train_id,]
+auto.test <- Autodf[-train_id,]
+```
+
+### Part d
+
+```{r}
+set.seed(1)
+auto.lda <- lda(mpg01~displacement+horsepower+acceleration+weight, data=auto.train)
+auto.ldapred <- predict(auto.lda, auto.test)$class
+table(auto.ldapred, auto.test$mpg01)
+(7+1)/98
+```
+
+The test error of the model is 8.16%.
+
+### Part e
+
+```{r}
+set.seed(1)
+auto.qda <- qda(mpg01~displacement+horsepower+acceleration+weight, data=auto.train)
+auto.qdapred <- predict(auto.qda, auto.test)$class
+table(auto.qdapred, auto.test$mpg01)
+(7+3)/98
+```
+
+The test error of the model is 10.02%.
+
+### Part f
+
+```{r}
+set.seed(1)
+auto.log <- glm(mpg01~displacement+horsepower+acceleration+weight, data=auto.train, family=binomial)
+auto.logprob <- predict(auto.log, auto.test, type="response")
+auto.logpred <- ifelse(auto.logprob > 0.5, 1, 0)
+table(auto.logpred, auto.test$mpg01)
+(5+3)/98
+```
+
+The test error of the model is 8.16%.
+
+### Part g
+
+### K = 1
+
+```{r}
+set.seed(1)
+autotrain.X <- cbind(auto.train$displacement, auto.train$horsepower, auto.train$weight, auto.train$acceleration)
+autotest.X <- cbind(auto.test$displacement, auto.test$horsepower, auto.test$weight, auto.test$acceleration)
+autoknn.pred <- knn(autotrain.X, autotest.X, auto.train$mpg01, k=1)
+table(autoknn.pred, auto.test$mpg01)
+(8+8)/98
+```
+
+### K = 5
+
+```{r}
+set.seed(1)
+autoknn.pred2 <- knn(autotrain.X, autotest.X, auto.train$mpg01, k=5)
+table(autoknn.pred2, auto.test$mpg01)
+(10+3)/98
+```
+
+
+### K = 10
+
+```{r}
+set.seed(1)
+autoknn.pred3 <- knn(autotrain.X, autotest.X, auto.train$mpg01, k=10)
+table(autoknn.pred3, auto.test$mpg01)
+(10+3)/98
+```
+
+### K = 30
+
+```{r}
+set.seed(1)
+autoknn.pred4 <- knn(autotrain.X, autotest.X, auto.train$mpg01, k=30)
+table(autoknn.pred4, auto.test$mpg01)
+(5+2)/98
+```
+### K = 50
+
+```{r}
+set.seed(1)
+autoknn.pred5 <- knn(autotrain.X, autotest.X, auto.train$mpg01, k=50)
+table(autoknn.pred5, auto.test$mpg01)
+(8+2)/98
+```
+
+KNN method appears to produce the lowest test error rate for approximately K = 30. 
+
+
+## ISLR Chapter 5
+
+## Question 2
+
+### Part a 
+
+
+If a bootstrap is not the jth observation, then it could take on the value of any other observation from the original sample except the jth value. 
+
+Hence, probability that the first bootstrap observation is not the jth observation: (n-1)/n
+
+### Part b
+
+Similar to part a, if the second bootstrap isn't the jth data point, it could be any of the other observations in the sample. 
+
+So, probability that the second bootstrap observation is not the jth observation: (n-1)/n
+
+### Part c
+
+Combining part a and part b: 
+
+If our bootstrap sample had only 2 iterations, then the probability for this case would be:
+
+((2-1)/2)*((2-1)/2) = ((2-1)/2)^2
+
+This can also be written as (1-1/2)^2. For nth iterations, the probability is: (1-1/n)^n
+
+### Part d
+
+When n = 5, Pr that jth is not in sample:
+```{r}
+(1-1/5)^5
+```
+
+Hence, Pr that jth is in sample:
+```{r}
+1- (1-1/5)^5
+```
+
+
+### Part e
+
+When n = 100, Pr that jth is in sample:
+```{r}
+1 - ((1-1/100)^100)
+```
+
+### Part f
+
+When n = 10,000, Pr that jth is in sample:
+```{r}
+1 - ((1-1/10000)^10000)
+```
+
+### Part g
+```{r}
+n <- c(1:100000)
+pr <- 1 - ((1-1/n)^n)
+plot(n, pr, main = "Probability of jth observation in the bootstrap sample",
+     xlab = "n", ylab = "Probability", ylim = c(0.6, 1.0))
+```
+
+### Part h
+
+```{r}
+store = rep(NA, 10000)
+for(i in 1:10000) {
+store[i] = sum(sample (1:100 , rep = TRUE) == 4) > 0
+}
+mean(store)
+```
+
+The above process gives similar result to the plot in part (g). In the probability plot, we can observe that as n grows large, the probability that a jth observation is in the bootstrap sample converges to approximately 0.60. 
+
+Similarly, when we repetedly create bootstrap samples and calculate the probability that j = 4 is in the sample, we arrive at 0.6295. 
+
+## Question 5
+
+```{r}
+set.seed(1)
+data("Default")
+attach(Default)
+```
+
+### Part a
+
+```{r}
+def.log <- glm(default ~ income + balance, data = Default, family = binomial)
+```
+
+### Part b
+
+```{r}
+set.seed(1)
+def.train <- sample(10000, 6000) # setting 60% for training and 40% for testing
+def.test <- Default[-def.train,]
+def.log2 <- glm(default ~ income + balance, data=Default, family = binomial, subset = def.train)
+def.probs <- predict(def.log2, def.test, type="response")
+def.preds <- ifelse(def.probs > 0.5, "Yes", "No")
+table(def.preds, def.test$default)
+(19+92)/4000 # Misclassification Error
+```
+
+### Part c
+
+#### Round 1
+
+```{r}
+set.seed(10)
+def.train2 <- sample(10000, 6000) # setting 60% for training and 40% for testing
+def.test2 <- Default[-def.train2,]
+def.log3 <- glm(default ~ income + balance, data=Default, family = binomial, subset = def.train2)
+def.probs2 <- predict(def.log3, def.test2, type="response")
+def.preds2 <- ifelse(def.probs2 > 0.5, "Yes", "No")
+table(def.preds2, def.test2$default)
+(15+95)/4000 # Misclassification Error
+```
+
+#### Round 2
+
+```{r}
+set.seed(20)
+def.train3 <- sample(10000, 6000) # setting 60% for training and 40% for testing
+def.test3 <- Default[-def.train3,]
+def.log4 <- glm(default ~ income + balance, data=Default, family = binomial, subset = def.train3)
+def.probs3 <- predict(def.log4, def.test3, type="response")
+def.preds3 <- ifelse(def.probs3 > 0.5, "Yes", "No")
+table(def.preds3, def.test3$default)
+(14+96)/4000 # Misclassification Error
+```
+
+#### Round 3
+
+```{r}
+set.seed(40)
+def.train4 <- sample(10000, 6000) # setting 60% for training and 40% for testing
+def.test4 <- Default[-def.train3,]
+def.log5 <- glm(default ~ income + balance, data=Default, family = binomial, subset = def.train4)
+def.probs4 <- predict(def.log5, def.test4, type="response")
+def.preds4 <- ifelse(def.probs4 > 0.5, "Yes", "No")
+table(def.preds4, def.test4$default)
+(15+95)/4000 # Misclassification Error
+```
+
+The validation error remains around 2.75% throughout the various rounds. This indicates that the variable default is not highly variant. 
+
+### Part d
+
+```{r}
+set.seed(5)
+def.train5 <- sample(10000, 5000)
+def.test5 <- Default[-def.train5, ]
+def.fit <- glm(default ~ income + balance + student, data=Default, family=binomial, subset=def.train5)
+def.probs5 <- predict(def.fit, def.test5, type="response")
+def.preds5 <- ifelse(def.probs5 > 0.5, "Yes", "No")
+table(def.preds5, def.test5$default)
+(15+113)/5000
+```
+
+The misclassification error for the model with the variable "student" is 2.56%. This is not a big drop in error rate when compared to the error rate of a model without student. 
+
+## Question 6
+
+### Part a 
+
+A logistic model was fit in the previous question, Part a. Using the same model: 
+
+```{r}
+summary(def.log)
+```
+
+The estimated standard errors for the coefficient is 4.985e-06 for income and 2.274e-04 for balance. 
+
+### Part b
+
+
+```{r}
+set.seed(1)
+boot.fn = function(data, index) return(coef(glm(default ~ income + balance, 
+    data = data, family = binomial, subset = index)))
+boot.fn(Default, sample(10000, 10000, replace =T))
+```
+
+### Part c
+
+```{r}
+boot(Default, boot.fn, 100)
+```
+
+### Part d
+
+Both the glm() and bootstrap functions give similar answers. The estimated standard errors for the coefficients only differ at the 7th decimal digit for income and the 4th decimal digit balance.
+
+## Question 7
+
+```{r}
+data(Weekly)
+```
+
+
+### Part a 
+```{r}
+w.log <- glm(Direction ~ Lag1 + Lag2, data = Weekly, family = binomial)
+summary(w.log)
+```
+
+### Part b
+```{r}
+Weekly2 <- Weekly[-1, ]
+w2.log <- glm(Direction ~ Lag1 + Lag2, data = Weekly2, family = binomial)
+summary(w2.log)
+```
+
+### Part c
+```{r}
+predict(w2.log, Weekly[1, ], type = "response") > 0.5
+```
+
+The predicted probability for Direction is over 0.5. Hence, the model predicts the direction of the first observation as "Up". However, the first observation in the Weekly data set for direction is "Down". Hence, this observation is wrongly classified. 
+
+### Part d
+
+```{r}
+loocv.error <- rep(0, nrow(Weekly))
+for (i in 1:nrow(Weekly)) {
+  model <- glm(Direction ~ Lag1 + Lag2, data=Weekly[-i,], family=binomial)
+  prob <- ifelse(predict.glm(model, Weekly[i,], type="response") > 0.5, "Up", "Down")
+  loocv.error[i] <- ifelse(Weekly[i,]$Direction==prob, 0, 1)    
+}
+```
+
+### Part e
+
+```{r}
+mean(loocv.error)
+```
+
+The LOOCV estimate for the test error is 0.4499. This method gives a high error rate for prediction, indicating that this method might not be optimal. 
